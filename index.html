@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CivicPol — Crowdsourced Civic Issue Reporting & Resolution System</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="icon" type="image/svg+xml" href="cp-logo.svg" />
+  <link rel="manifest" href="/manifest.json" />
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+</head>
+<body>
+  <div id="toast"></div>
+
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar reveal" data-animate="slide-left">
+      <div class="brand">
+        <img src="cp-logo.svg" alt="CivicPol" class="brand-logo" />
+        <div>
+          <div class="brand-title">CivicPol</div>
+          <div class="brand-sub">Crowdsourced Civic Issue Reporting & Resolution</div>
+        </div>
+      </div>
+
+      <nav class="side-nav">
+        <a class="nav-item active" id="navDashboard"><span>🏠</span> Dashboard</a>
+        <a class="nav-item" id="open-report"><span>📷</span> Report an Issue</a>
+        <a class="nav-item" href="reports.html" id="navViewReports"><span>📋</span> View All Reports</a>
+        <a class="nav-item disabled" id="navAnalytics"><span>📈</span> Analytics (Soon)</a>
+      </nav>
+
+      <div class="hotspot-card">
+        <div class="hotspot-title" id="hotspotTitle">Hotspot Alerts</div>
+        <ul id="hotspot-list" class="hotspot-list"><li>Loading…</li></ul>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+      <header class="topbar reveal" data-animate="fade-up">
+        <div class="hello">
+          <h1 id="helloTitle">Hello, Citizen! What can we fix today?</h1>
+          <p class="muted" id="txtTotalReports">Total Reports</p>
+          <div class="big-number" id="totalReports">0</div>
+        </div>
+        <div class="top-actions" style="gap:12px; align-items:center">
+          <!-- Language (Google Translate) -->
+          <div style="display:flex;align-items:center;gap:6px">
+            <label for="gLangSelect" class="muted" style="font-size:12px">Change Language</label>
+            <select id="gLangSelect" class="input-sm" title="Language"></select>
+          </div>
+          <!-- Hidden container for Google Translate widget -->
+          <div id="google_translate_element" style="position:absolute; left:-9999px; height:0; width:0; overflow:hidden;"></div>
+
+          <img src="cp-logo-compact.svg" alt="CivicPol" class="hdr-logo" />
+          <button class="btn gradient" id="new-report-btn">+ New Report</button>
+          <button class="btn" id="adminBtn">Admin Login</button>
+        </div>
+      </header>
+
+      <section class="status-grid">
+        <div class="stat-card card-pending reveal" data-animate="pop">
+          <div class="stat-title" id="titlePending">Pending</div>
+          <div class="stat-num" id="cntPending">0</div>
+          <div class="stat-icon">⏳</div>
+        </div>
+        <div class="stat-card card-progress reveal" data-animate="pop">
+          <div class="stat-title" id="titleProgress">In Progress</div>
+          <div class="stat-num" id="cntProgress">0</div>
+          <div class="stat-icon">🛠️</div>
+        </div>
+        <div class="stat-card card-resolved reveal" data-animate="pop">
+          <div class="stat-title" id="titleResolved">Resolved</div>
+          <div class="stat-num" id="cntResolved">0</div>
+          <div class="stat-icon">✅</div>
+        </div>
+      </section>
+
+      <section class="insights-grid">
+        <div class="panel reveal" data-animate="fade-up">
+          <div class="panel-title" id="panelTopCategories">Top Categories</div>
+          <ul class="cat-list" id="topCategories"></ul>
+        </div>
+        <div class="panel reveal" data-animate="fade-up">
+          <div class="panel-title" id="panelReportsThisMonth">Reports This Month</div>
+          <div class="month-wrap">
+            <div class="month-num" id="reportsThisMonth">0</div>
+            <div class="month-sub" id="autoAssignedDept">Auto-assigned Department</div>
+            <div class="tiny-chart">
+              <div class="bar" style="height:45%"></div>
+              <div class="bar" style="height:80%"></div>
+              <div class="bar" style="height:65%"></div>
+              <div class="bar" style="height:90%"></div>
+              <div class="bar" style="height:55%"></div>
+            </div>
+          </div>
+        </div>
+        <div class="panel reveal" data-animate="fade-up">
+          <div class="panel-title" id="panelLiveHotspot">Live Hotspot Map</div>
+          <div id="map" class="map"></div>
+        </div>
+      </section>
+
+      <section class="panel reveal" data-animate="fade-up">
+        <div class="panel-title" id="panelFiltersTitle">Filters</div>
+        <div class="filters">
+          <select id="filterCategory">
+            <option value="">All Categories</option>
+            <option>Pothole</option>
+            <option>Waterlogging / Drainage</option>
+            <option>Streetlight not working</option>
+            <option>Garbage dumped</option>
+            <option>Traffic signal not working</option>
+            <option>Encroachment</option>
+          </select>
+          <select id="filterStatus">
+            <option value="">All Status</option>
+            <option>Pending</option>
+            <option>In Progress</option>
+            <option>Resolved</option>
+          </select>
+          <input id="filterQuery" placeholder="Search description/location…" />
+          <button class="btn light" id="applyFilters">Apply</button>
+          <button class="btn" id="clearFilters">Clear</button>
+        </div>
+      </section>
+
+      <section class="panel reveal" data-animate="fade-up">
+        <div class="panel-title-row">
+          <div class="panel-title" id="panelRecentTitle">Recent Reports</div>
+          <button class="btn light" id="refreshBtn">Refresh</button>
+        </div>
+        <div class="table">
+          <div class="thead" id="recentHead">
+            <div id="thCat">Category</div>
+            <div id="thDesc">Description</div>
+            <div id="thSev">Severity</div>
+            <div id="thStatus">Status</div>
+          </div>
+          <div class="tbody" id="recentBody"></div>
+        </div>
+      </section>
+
+      <section class="panel reveal" data-animate="fade-up">
+        <div class="panel-title" id="panelGallery">Photo Gallery</div>
+        <div id="gallery" class="gallery"></div>
+      </section>
+    </main>
+  </div>
+
+  <button id="fab" class="fab">+</button>
+
+  <!-- Report Modal -->
+  <div class="modal" id="reportModal" aria-hidden="true">
+    <div class="modal-backdrop" id="modalBackdrop"></div>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="modalReportTitle">Report New Issue</h3>
+        <button class="icon-btn" id="closeModal">✖</button>
+      </div>
+
+      <form id="reportForm" class="form" method="post" action="/api/reports" enctype="multipart/form-data">
+        <label id="lblName">Name</label>
+        <div class="input-wrap">
+          <input name="name" id="nameInput" placeholder="Your name" />
+          <button type="button" class="icon-in icon-mic" id="micName" aria-label="Speak name">🎤</button>
+        </div>
+
+        <label id="lblCategory">Category</label>
+        <select name="category" id="categorySelect" required>
+          <option value="">Select category</option>
+          <option>Pothole</option>
+          <option>Waterlogging / Drainage</option>
+          <option>Streetlight not working</option>
+          <option>Garbage dumped</option>
+          <option>Traffic signal not working</option>
+          <option>Encroachment</option>
+        </select>
+
+        <label id="lblSeverity">Severity</label>
+        <select name="severity" id="severitySelect" required>
+          <option>Normal</option>
+          <option>Minor</option>
+          <option>Urgent</option>
+          <option>Accident-causing</option>
+        </select>
+
+        <label id="lblLocation">Location</label>
+        <div class="input-wrap">
+          <input name="location" id="locInput" placeholder="Lat:19.07600, Lon:72.87770 or landmark" />
+          <button type="button" class="icon-in icon-gps" id="btnUseGPS" title="Use my GPS">🧭</button>
+        </div>
+
+        <label id="lblDescription">Description</label>
+        <div class="input-wrap">
+          <textarea id="descBox" name="description" rows="4" placeholder="Describe the issue..."></textarea>
+          <button type="button" class="icon-in icon-mic" id="micDesc" aria-label="Speak description">🎤</button>
+        </div>
+
+        <label id="lblPhotos">Photos (optional)</label>
+        <input name="photos" id="photos" type="file" accept="image/*" capture="environment" multiple />
+        <div id="photoPreview" class="preview-row"></div>
+
+        <button class="btn gradient" id="submitReportBtn" type="submit">Submit Report ✅</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit modal -->
+  <div class="modal" id="editModal" aria-hidden="true">
+    <div class="modal-backdrop" data-close-edit></div>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="editModalTitle">Edit Report</h3>
+        <button class="icon-btn" data-close-edit>✖</button>
+      </div>
+      <form id="editForm" class="form">
+        <input type="hidden" name="id" />
+        <label id="elblName">Name</label>
+        <input name="name" />
+        <label id="elblCategory">Category</label>
+        <select name="category" required>
+          <option>Pothole</option>
+          <option>Waterlogging / Drainage</option>
+          <option>Streetlight not working</option>
+          <option>Garbage dumped</option>
+          <option>Traffic signal not working</option>
+          <option>Encroachment</option>
+        </select>
+        <label id="elblSeverity">Severity</label>
+        <select name="severity" required>
+          <option>Normal</option>
+          <option>Minor</option>
+          <option>Urgent</option>
+          <option>Accident-causing</option>
+        </select>
+        <label id="elblStatus">Status</label>
+        <select name="status">
+          <option>Pending</option>
+          <option>In Progress</option>
+          <option>Resolved</option>
+        </select>
+        <label id="elblLocation">Location</label>
+        <input name="location" />
+        <label id="elblDescription">Description</label>
+        <textarea name="description" rows="3"></textarea>
+        <button class="btn gradient" id="editSaveBtn" type="submit">Save Changes 💾</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Admin Login Modal -->
+  <div class="modal" id="adminLoginModal" aria-hidden="true">
+    <div class="modal-backdrop" data-close-login></div>
+    <div class="modal-card login-card">
+      <div class="modal-head">
+        <h3 id="adminLoginTitle">Admin Login</h3>
+        <button class="icon-btn" data-close-login>✖</button>
+      </div>
+      <form id="adminLoginForm" class="form">
+        <label id="alblUser">Admin ID</label>
+        <input class="input-md" name="username" placeholder="Admin ID" />
+        <label id="alblPass">Password</label>
+        <input class="input-md" type="password" name="password" placeholder="Password" />
+        <div class="login-actions">
+          <button type="button" class="btn light" data-close-login id="btnCancelLogin">Cancel</button>
+          <button type="submit" class="btn gradient" id="btnDoLogin">Login</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Case QR Modal -->
+  <div class="modal" id="caseModal" aria-hidden="true">
+    <div class="modal-backdrop" data-close-case></div>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="caseModalTitle">Report Submitted</h3>
+        <button class="icon-btn" data-close-case>✖</button>
+      </div>
+      <p class="muted" id="caseModalHint">Track this case using the QR or link below.</p>
+      <div style="display:flex;gap:16px;align-items:center">
+        <canvas id="qrCanvas" width="160" height="160" style="border-radius:8px;box-shadow:var(--ring)"></canvas>
+        <div>
+          <div id="caseIdText" style="font-weight:800;margin-bottom:6px"></div>
+          <input id="caseLinkInput" class="input-md" readonly />
+          <div class="login-actions" style="margin-top:8px">
+            <button class="btn light" id="copyCaseLink">Copy link</button>
+            <a id="openCaseLink" class="btn gradient" target="_blank">Open case</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lightbox -->
+  <div id="lightbox" class="lightbox" aria-hidden="true">
+    <div class="lightbox-backdrop"></div>
+    <img id="lightboxImg" alt="Preview" />
+  </div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    const ADMIN_KEY = 'civicpol_admin_token';
+    const OWNER_MAP_KEY = 'civicpol_report_keys';
+    const G_LANG_KEY = 'civicpol_g_lang';
+
+    // Languages for Google Translate dropdown (ISO language codes)
+    const GT_LANGS = {
+      en:'English', hi:'हिन्दी', mr:'मराठी', bn:'বাংলা', ta:'தமிழ்', te:'తెలుగు',
+      gu:'ગુજરાતી', kn:'ಕನ್ನಡ', ml:'മലയാളം', pa:'ਪੰਜਾਬੀ', ur:'اردو', or:'ଓଡ଼ିଆ',
+      as:'অসমীয়া', ne:'नेपाली', sd:'سنڌي'
+    };
+    // Map to Speech Recognition locales for voice input
+    const SR_LOCALE = {
+      en: 'en-IN', hi: 'hi-IN', mr: 'mr-IN', bn: 'bn-IN', ta: 'ta-IN', te: 'te-IN',
+      gu: 'gu-IN', kn: 'kn-IN', ml: 'ml-IN', pa:'pa-IN', ur:'ur-PK', or:'or-IN',
+      as:'as-IN', ne:'ne-NP', sd:'sd-IN'
+    };
+
+    // DOM helpers
+    const $  = (s)=>document.querySelector(s);
+    const $$ = (s)=>document.querySelectorAll(s);
+    const el = (t,c,txt)=>{ const e=document.createElement(t); if(c) e.className=c; if(txt!==undefined) e.textContent=txt; return e; };
+
+    // Google Translate dropdown population
+    function fillGoogleLangSelect(){
+      const sel = $('#gLangSelect'); sel.innerHTML='';
+      Object.entries(GT_LANGS).forEach(([code,name])=>{
+        const op=document.createElement('option'); op.value=code; op.textContent=name; sel.appendChild(op);
+      });
+      const saved = localStorage.getItem(G_LANG_KEY) || (navigator.language||'en').slice(0,2);
+      sel.value = GT_LANGS[saved] ? saved : 'en';
+      sel.onchange = () => {
+        const lang = sel.value;
+        localStorage.setItem(G_LANG_KEY, lang);
+        // Bind Speech-to-Text language for mic
+        localStorage.setItem('voiceLang', SR_LOCALE[lang] || 'en-IN');
+        setGoogleLang(lang);
+      };
+    }
+
+    // Google Translate widget init
+    window.googleTranslateElementInit = function(){
+      new google.translate.TranslateElement({
+        pageLanguage: 'en',
+        includedLanguages: Object.keys(GT_LANGS).join(','),
+        autoDisplay: false
+      }, 'google_translate_element');
+
+      // Apply saved language after widget is ready
+      const saved = localStorage.getItem(G_LANG_KEY) || 'en';
+      setTimeout(()=> setGoogleLang(saved), 500);
+    };
+
+    function setGoogleLang(lang){
+      const sel = document.querySelector('select.goog-te-combo');
+      if (!sel){ setTimeout(()=>setGoogleLang(lang), 200); return; }
+      if (sel.value !== lang){
+        sel.value = lang;
+        sel.dispatchEvent(new Event('change'));
+      }
+    }
+
+    // Auth helpers and owner keys
+    async function verifyAdmin(){
+      const t=localStorage.getItem(ADMIN_KEY);
+      if(!t) return false;
+      try { const r=await fetch('/api/auth/verify',{ headers:{ Authorization:'Bearer '+t } }); return r.ok; }
+      catch { return false; }
+    }
+    async function authFetch(url,opts={}){ const t=localStorage.getItem(ADMIN_KEY); const h=Object.assign({},opts.headers||{}, t?{ Authorization:'Bearer '+t }:{}); return fetch(url,Object.assign({},opts,{headers:h})); }
+    function getOwnerMap(){ try { return JSON.parse(localStorage.getItem(OWNER_MAP_KEY)||'{}'); } catch { return {}; } }
+    function setOwnerMap(m){ localStorage.setItem(OWNER_MAP_KEY, JSON.stringify(m)); }
+    function isOwner(id){ const m = getOwnerMap(); return !!m[id]; }
+    function ownerFetch(id,url,opts={}){ const m=getOwnerMap(); const key=m[id]; const h=Object.assign({},opts.headers||{}, key?{ 'X-Report-Key':key }:{}); return fetch(url,Object.assign({},opts,{headers:h})); }
+
+    // Toast
+    function toast(msg, type='ok'){
+      const t = $('#toast'); const n = el('div','toast '+type,msg); t.appendChild(n);
+      requestAnimationFrame(()=> n.classList.add('show'));
+      setTimeout(()=> { n.classList.remove('show'); setTimeout(()=> n.remove(), 250); }, 2000);
+    }
+
+    // Reveal animations
+    const io = new IntersectionObserver((entries)=>{ entries.forEach(e=>{ if (e.isIntersecting) e.target.classList.add('in'); }); },{ threshold: 0.1 });
+    $$('.reveal').forEach(x=> io.observe(x));
+
+    // Map / Data
+    let map, markersLayer, allReports=[];
+    function ensureMap(){ if (map) return; map = L.map('map').setView([29.1492, 75.7217], 12); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,attribution:'© OpenStreetMap'}).addTo(map); markersLayer=L.layerGroup().addTo(map); }
+
+    async function loadStats(){
+      const s=await (await fetch('/api/stats')).json();
+      $('#totalReports').textContent=s.totalReports; $('#cntPending').textContent=s.counts['Pending']||0; $('#cntProgress').textContent=s.counts['In Progress']||0; $('#cntResolved').textContent=s.counts['Resolved']||0; $('#reportsThisMonth').textContent=s.reportsThisMonth;
+      const ul=$('#topCategories'); ul.innerHTML=''; const badges=['gold','teal','blue'];
+      s.topCategories.forEach((c,i)=>{ const li=el('li'); const left=el('div','cat-name'); left.append(el('span','badge '+badges[i%badges.length],c.category.split(' ')[0]), el('span','',c.category)); li.append(left,el('strong','',`${c.percent}%`)); ul.appendChild(li); });
+      const side=$('#hotspot-list'); side.innerHTML=''; s.hotspots.slice(0,5).forEach(h=> side.appendChild(el('li','',`Area ~ (${h.lat.toFixed(3)}, ${h.lng.toFixed(3)}) — ${h.count} reports`)));
+      ensureMap(); markersLayer.clearLayers(); s.hotspots.forEach(h=>{ markersLayer.addLayer(L.circleMarker([h.lat,h.lng],{radius:10+Math.min(h.count,12),color:'#2563EB',fillColor:'#22D3EE',fillOpacity:.6,weight:2}).bindTooltip(`${h.count} reports`)); });
+    }
+
+    function pill(status){ const span=el('span','pill'); if(status==='Pending') span.classList.add('pending'); else if(status==='In Progress') span.classList.add('progress'); else span.classList.add('resolved'); span.textContent=status; return span; }
+
+    function applyLocalFilters(){ const cat=$('#filterCategory').value, st=$('#filterStatus').value, q=$('#filterQuery').value.trim().toLowerCase(); return allReports.filter(r=>{ const okCat=!cat||r.category===cat, okSt=!st||r.status===st; const okQ=!q||(r.description?.toLowerCase().includes(q)||r.location?.toLowerCase().includes(q)||r.category.toLowerCase().includes(q)); return okCat&&okSt&&okQ; }); }
+
+    function renderRecent(list){
+      const adminMode = (localStorage.getItem(ADMIN_KEY) != null);
+      const body=$('#recentBody'); body.innerHTML='';
+      list.slice(0,12).forEach(r=>{
+        const row=el('div','row reveal'); row.dataset.animate='fade-up';
+        const c1=el('div','cell'); const img=el('img','thumb'); img.src=(r.photos&&r.photos[0])||'https://picsum.photos/seed/civicpol/80/60'; img.alt='photo'; img.onclick=()=>openLightbox(img.src); c1.append(img,el('div','',r.category));
+        const c2=el('div','cell'); c2.textContent=r.description||'-';
+        const c3=el('div','cell'); c3.textContent=r.severity;
+        const c4=el('div','cell cell-actions'); c4.appendChild(pill(r.status));
+        if (adminMode || isOwner(r.id)){
+          const up=el('button','btn xs','Upload Photo'); up.classList.add('upload-photo-btn'); up.dataset.id=r.id;
+          const ed=el('button','btn xs warn','Edit');      ed.classList.add('edit-report-btn');   ed.dataset.id=r.id;
+          const del=el('button','btn xs danger','Delete'); del.classList.add('delete-report-btn'); del.dataset.id=r.id;
+          c4.append(up,ed,del);
+        }
+        row.append(c1,c2,c3,c4); body.appendChild(row); io.observe(row);
+      });
+    }
+
+    async function loadRecent(remote=true){
+      if(remote){ allReports=await (await fetch('/api/reports?limit=500')).json(); }
+      renderRecent(applyLocalFilters()); renderGallery();
+    }
+
+    function renderGallery(){ const g=$('#gallery'); g.innerHTML=''; const photos=[]; allReports.forEach(r=>(r.photos||[]).forEach(p=>photos.push({url:p,cat:r.category}))); photos.slice(0,12).forEach(p=>{ const card=el('div','g-item reveal'); card.dataset.animate='pop'; const img=el('img'); img.src=p.url; img.alt=p.cat; img.onclick=()=>openLightbox(p.url); const badge=el('div','g-badge',p.cat); card.append(img,badge); g.appendChild(card); io.observe(card); }); if(!photos.length) g.textContent='No photos yet. Upload with a report!'; }
+
+    function openLightbox(src){ const lb=$('#lightbox'); $('#lightboxImg').src=src; lb.classList.add('show'); }
+    $('#lightbox').addEventListener('click', ()=> $('#lightbox').classList.remove('show'));
+
+    // Modals
+    function showModal(show){ const m=$('#reportModal'); if (show){ m.classList.add('show'); document.body.classList.add('modal-open'); } else { m.classList.remove('show'); document.body.classList.remove('modal-open'); } }
+    function showEdit(show){ const m=$('#editModal'); if (show){ m.classList.add('show'); document.body.classList.add('modal-open'); } else { m.classList.remove('show'); document.body.classList.remove('modal-open'); } }
+    function showLogin(show){ const m=$('#adminLoginModal'); if (show){ m.classList.add('show'); document.body.classList.add('modal-open'); } else { m.classList.remove('show'); document.body.classList.remove('modal-open'); } }
+
+    $('#new-report-btn').addEventListener('click', ()=>showModal(true));
+    $('#open-report').addEventListener('click', ()=>showModal(true));
+    $('#fab').addEventListener('click', ()=>showModal(true));
+    $('#closeModal').addEventListener('click', ()=>showModal(false));
+    $('#modalBackdrop').addEventListener('click', ()=>showModal(false));
+    $$('[data-close-edit]').forEach(b=> b.addEventListener('click', ()=>showEdit(false)));
+    $$('[data-close-login]').forEach(b=> b.addEventListener('click', ()=>showLogin(false)));
+
+    // Admin button toggles Login / Logout
+    async function updateAdminState(){
+      const ok = await verifyAdmin();
+      $('#adminBtn').textContent = ok ? 'Logout Admin' : 'Admin Login';
+    }
+    $('#adminBtn').addEventListener('click', async ()=>{
+      if (await verifyAdmin()){
+        await authFetch('/api/auth/logout',{ method:'POST' });
+        localStorage.removeItem(ADMIN_KEY);
+        toast('Logged out','ok');
+        await updateAdminState();
+        renderRecent(applyLocalFilters());
+      } else {
+        showLogin(true);
+      }
+    });
+
+    // Admin login form
+    $('#adminLoginForm').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const payload = Object.fromEntries(fd.entries());
+      const res = await fetch('/api/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (!res.ok || !data.success){ toast('Invalid credentials','err'); return; }
+      localStorage.setItem(ADMIN_KEY, data.token);
+      toast('Admin mode enabled 🔒','ok');
+      showLogin(false);
+      await updateAdminState();
+      renderRecent(applyLocalFilters());
+    });
+
+    // Client-side image compression
+    async function compressImage(file, maxW = 1280, quality = 0.82){
+      if (!file.type.startsWith('image/')) return file;
+      const img = new Image();
+      const blobURL = URL.createObjectURL(file);
+      await new Promise((res)=>{ img.onload=res; img.src=blobURL; });
+      const scale = Math.min(1, maxW / img.width);
+      const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, w, h);
+      return new Promise((res)=> {
+        canvas.toBlob((blob)=>{
+          const out = new File([blob], (file.name || 'photo').replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' });
+          res(out);
+        }, 'image/jpeg', quality);
+      });
+    }
+
+    // Photo preview
+    $('#photos').addEventListener('change',(e)=>{
+      const box=$('#photoPreview'); box.innerHTML='';
+      [...e.target.files].forEach(f=>{ const url=URL.createObjectURL(f); const i=el('img','thumb'); i.src=url; box.appendChild(i); });
+    });
+
+    // Submit report (with compression)
+    $('#reportForm').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const form=e.target;
+
+      // Build FormData manually to compress images
+      const fd = new FormData();
+      const fields = new FormData(form);
+      for (const [k,v] of fields.entries()) {
+        if (k !== 'photos') fd.append(k, v);
+      }
+      const files = document.getElementById('photos').files || [];
+      for (let i = 0; i < files.length; i++) {
+        const small = await compressImage(files[i]);
+        fd.append('photos', small, small.name);
+      }
+
+      const res=await fetch(form.action,{ method:'POST', body:fd });
+      const data=await res.json().catch(()=>({ success:false, error:'Invalid JSON' }));
+      if (!res.ok||!data.success){ toast('Submit failed: '+(data.error||res.status),'err'); return; }
+
+      // store ownerKey so this browser can manage its own report
+      const map=getOwnerMap(); map[data.id]=data.ownerKey; setOwnerMap(map);
+
+      // Show QR case modal
+      const link=`${location.origin}/case/${data.report.publicId}`;
+      showCaseModal(link, data.report.publicId);
+
+      await Promise.all([loadStats(), loadRecent()]);
+      showModal(false);
+    });
+
+    // Row actions (owner or admin)
+    $('#recentBody').addEventListener('click', async (e)=>{
+      const upload=e.target.closest('.upload-photo-btn'), edit=e.target.closest('.edit-report-btn'), del=e.target.closest('.delete-report-btn');
+      if (upload){
+        const id=Number(upload.dataset.id); const input=document.createElement('input'); input.type='file'; input.accept='image/*';
+        input.onchange=async ()=>{
+          const small=await compressImage(input.files[0]);
+          const fd=new FormData(); fd.append('photo',small,small.name);
+          const req=(await verifyAdmin()) ? authFetch(`/api/reports/${id}/photos`,{method:'POST',body:fd})
+                             : ownerFetch(id,`/api/reports/${id}/photos`,{method:'POST',body:fd});
+          const r=await req; if(r.ok){ toast('Photo added 📷'); await loadRecent(); } else toast('Upload failed','err');
+        }; input.click();
+      }
+      if (edit){
+        const id=Number(edit.dataset.id); const r=allReports.find(x=>x.id===id); if(!r) return;
+        const f=$('#editForm'); f.id.value=r.id; f.name.value=r.name||''; f.category.value=r.category; f.severity.value=r.severity; f.status.value=r.status; f.location.value=r.location||''; f.description.value=r.description||'';
+        // Hide Status for non-admin
+        const admin = await verifyAdmin();
+        const statusField = f.querySelector('select[name="status"]');
+        const statusLabel = statusField?.previousElementSibling;
+        if (!admin){ if (statusField) statusField.style.display='none'; if (statusLabel) statusLabel.style.display='none'; }
+        else { if (statusField) statusField.style.display=''; if (statusLabel) statusLabel.style.display=''; }
+        showEdit(true);
+        f.onsubmit=async(ev)=>{
+          ev.preventDefault();
+          const payload={ name:f.name.value, category:f.category.value, severity:f.severity.value, status:f.status.value, location:f.location.value, description:f.description.value };
+          const req=(await verifyAdmin()) ? authFetch(`/api/reports/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+                             : ownerFetch(id,`/api/reports/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+          const r=await req; if(r.ok){ toast('Updated ✅'); showEdit(false); await Promise.all([loadStats(), loadRecent()]); } else toast('Update failed','err'); };
+      }
+      if (del){
+        const id=Number(del.dataset.id); if(!confirm('Delete this report? This cannot be undone.')) return;
+        const req=(await verifyAdmin()) ? authFetch(`/api/reports/${id}`,{method:'DELETE'})
+                           : ownerFetch(id,`/api/reports/${id}`,{method:'DELETE'});
+        const r=await req; if(r.ok){ toast('Report deleted 🗑️'); await Promise.all([loadStats(), loadRecent()]); } else toast('Delete failed','err'); }
+    });
+
+    // GPS
+    async function reverseGeocode(lat,lng){
+      const lang = localStorage.getItem(G_LANG_KEY) || 'en';
+      const url=`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=${encodeURIComponent(lang)}`;
+      const res=await fetch(url,{ headers:{'Accept':'application/json'} });
+      if(!res.ok) throw new Error('Reverse geocode failed');
+      const data=await res.json(); return data.display_name||'';
+    }
+    function setLocationInput(lat,lng,address){ const loc=$('#locInput'); const la=Number(lat).toFixed(5); const lo=Number(lng).toFixed(5); loc.value=address?`${address} (Lat:${la}, Lon:${lo})`:`Lat:${la}, Lon:${lo}`; }
+    async function useGPS(){
+      const btn=$('#btnUseGPS'); btn.disabled=true; const old=btn.textContent; btn.textContent='⏳';
+      if(!navigator.geolocation){ btn.disabled=false; btn.textContent=old; toast('Geolocation not supported','err'); return; }
+      navigator.geolocation.getCurrentPosition(async(pos)=>{
+        try{ const {latitude,longitude}=pos.coords; const addr=await reverseGeocode(latitude,longitude).catch(()=> ''); setLocationInput(latitude,longitude,addr); toast('Location set via GPS 🧭'); }
+        catch{ setLocationInput(pos.coords.latitude,pos.coords.longitude,''); toast('Set lat/lon (address unavailable)','err'); }
+        finally{ btn.disabled=false; btn.textContent=old; }
+      },(err)=>{ btn.disabled=false; btn.textContent=old; toast('Location error: '+err.message,'err'); },{ enableHighAccuracy:true, timeout:10000, maximumAge:0 });
+    }
+    $('#btnUseGPS').addEventListener('click', useGPS);
+
+    // Voice input (Web Speech API)
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+    function setListening(btn, on){
+      if (!btn) return;
+      if (on){ btn.classList.add('listening'); btn.textContent = '●'; btn.title = 'Listening… click to stop'; }
+      else   { btn.classList.remove('listening'); btn.textContent = '🎤'; btn.title = 'Voice input'; }
+    }
+    function startVoice(el, btn, {continuous=false, append=true}={}){
+      if (!SR){ toast('Voice input not supported in this browser','err'); return; }
+      if (startVoice.active){ try { startVoice.rec.stop(); } catch{} return; }
+      const rec = new SR();
+      startVoice.rec = rec; startVoice.active = true;
+      rec.lang = localStorage.getItem('voiceLang') || 'en-IN';
+      rec.interimResults = true;
+      rec.continuous = continuous;
+      let base = append ? (el.value || '') : '';
+      setListening(btn, true);
+
+      rec.onresult = (e)=>{
+        let txt = '';
+        for (let i=e.resultIndex; i<e.results.length; i++){
+          txt += e.results[i][0].transcript;
+        }
+        if (continuous) el.value = (base + ' ' + txt).replace(/\s+/g,' ').trimStart();
+        else el.value = txt.trim();
+      };
+      rec.onerror = (ev)=> { console.warn('speech error', ev.error); toast('Mic error: '+ev.error, 'err'); };
+      rec.onend = ()=> { setListening(btn,false); startVoice.active=false; startVoice.rec=null; };
+      rec.start();
+    }
+    const micName = document.getElementById('micName');
+    const micDesc = document.getElementById('micDesc');
+    const nameEl = document.getElementById('nameInput');
+    const descEl = document.getElementById('descBox');
+    micName?.addEventListener('click', ()=> startVoice(nameEl, micName, { continuous:false, append:false }));
+    micDesc?.addEventListener('click', ()=> startVoice(descEl, micDesc, { continuous:true, append:true }));
+
+    // PWA SW
+    if ('serviceWorker' in navigator) window.addEventListener('load', ()=> navigator.serviceWorker.register('/service-worker.js').catch(console.warn));
+
+    // Case QR modal helpers
+    function showCaseModal(link, publicId){
+      const m = document.getElementById('caseModal');
+      document.getElementById('caseIdText').textContent = `Case: ${publicId}`;
+      const inp = document.getElementById('caseLinkInput'); inp.value = link;
+      document.getElementById('openCaseLink').href = link;
+      const canvas = document.getElementById('qrCanvas');
+      QRCode.toCanvas(canvas, link, { width: 160, margin: 1 }, () => {});
+      m.classList.add('show'); document.body.classList.add('modal-open');
+    }
+    function closeCaseModal(){ const m = document.getElementById('caseModal'); m.classList.remove('show'); document.body.classList.remove('modal-open'); }
+    document.querySelectorAll('[data-close-case]').forEach(b => b.addEventListener('click', closeCaseModal));
+    document.getElementById('copyCaseLink')?.addEventListener('click', async ()=>{
+      const link = document.getElementById('caseLinkInput').value;
+      try { await navigator.clipboard.writeText(link); toast('Link copied','ok'); }
+      catch { const inp = document.getElementById('caseLinkInput'); inp.select(); inp.setSelectionRange(0, 99999); document.execCommand('copy'); toast('Link copied','ok'); }
+    });
+
+    (async function init(){
+      fillGoogleLangSelect();
+      // Initialize voice language from picker
+      const initLang = $('#gLangSelect').value || 'en';
+      localStorage.setItem('voiceLang', SR_LOCALE[initLang] || 'en-IN');
+
+      ensureMap();
+      await updateAdminState();
+      await loadStats();
+      await loadRecent();
+      const params = new URLSearchParams(location.search);
+      if (params.get('login') === '1' && !(await verifyAdmin())) showLogin(true);
+      setInterval(()=>{ loadStats(); loadRecent(false); }, 30000);
+    })();
+  </script>
+
+  <!-- Load Google Translate last -->
+  <script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+</body>
+</html>
