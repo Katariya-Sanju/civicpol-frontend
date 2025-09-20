@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CivicPol — Admin Redirect</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" type="image/svg+xml" href="cp-logo.svg" />
+  <style>
+    body{margin:0;min-height:100vh;display:grid;place-items:center;
+      background:radial-gradient(1200px 600px at 10% 0%, #eaffff, transparent 60%),
+                 radial-gradient(1000px 600px at 100% 0%, #effff6, transparent 60%),
+                 radial-gradient(1200px 800px at 40% 100%, #eef4ff, transparent 60%),
+                 linear-gradient(135deg,#E6F9FF,#EEF9F3 40%,#EEF2FF)}
+    .card{background:rgba(255,255,255,.72);backdrop-filter:blur(8px) saturate(1.1);border:1px solid rgba(255,255,255,.45);
+      border-radius:16px;box-shadow:0 12px 24px rgba(16,24,40,.08);padding:20px 22px;text-align:center;font-family:Inter,system-ui,sans-serif}
+    .muted{color:#64748B}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Redirecting to Dashboard…</h2>
+    <p class="muted">If this page stays here, <a href="index.html">click here</a>.</p>
+  </div>
+  <script>
+    const ADMIN_KEY = 'civicpol_admin_token';
+    (async () => {
+      const token = localStorage.getItem(ADMIN_KEY);
+      let ok = false;
+      if (token) {
+        try {
+          const res = await fetch('/api/auth/verify', { headers: { Authorization: 'Bearer ' + token } });
+          ok = res.ok;
+        } catch {}
+      }
+      const url = new URL('index.html', location.origin);
+      if (!ok) url.searchParams.set('login', '1');
+      location.replace(url.toString());
+    })();
+  </script>
+</body>
+</html>

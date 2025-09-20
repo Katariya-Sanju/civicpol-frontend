@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>CivicPol — Case</title>
+  <link rel="stylesheet" href="style.css"/>
+  <link rel="icon" type="image/svg+xml" href="cp-logo.svg" />
+  <style>
+    body{background:linear-gradient(135deg,#E6F9FF,#EEF9F3 40%,#EEF2FF)}
+    .wrap{max-width:900px;margin:24px auto;padding:16px}
+    .card{background:#fff;border-radius:16px;box-shadow:0 12px 24px rgba(16,24,40,.06);padding:16px 18px}
+    .title{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    .pill{padding:6px 10px;border-radius:999px;font-weight:800}
+    .pill.pending{background:#FFE29A}
+    .pill.progress{background:#CFFAE3}
+    .pill.resolved{background:#CFE1FF}
+    .grid{display:grid;grid-template-columns:1.4fr 1fr;gap:16px}
+    .timeline{list-style:none;margin:0;padding:0}
+    .timeline li{padding:8px 0;border-bottom:1px solid #eef2f7}
+    .photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+    .photos img{width:100%;height:120px;object-fit:cover;border-radius:12px}
+    @media(max-width:800px){.grid{grid-template-columns:1fr}}
+    /* Simple lang control */
+    .lang-top{position:fixed;right:16px;top:12px;display:flex;gap:6px;align-items:center;z-index:1000}
+    .lang-top label{font-size:12px;color:#64748B}
+  </style>
+</head>
+<body>
+  <!-- Language (Google Translate) -->
+  <div class="lang-top">
+    <label for="gLangSelect">Change Language</label>
+    <select id="gLangSelect" class="input-sm"></select>
+  </div>
+  <div id="google_translate_element" style="position:absolute; left:-9999px; height:0; width:0; overflow:hidden;"></div>
+
+  <div class="wrap">
+    <div class="card">
+      <div class="title">
+        <h2 id="caseTitle">Case</h2>
+        <span id="caseStatus" class="pill">-</span>
+      </div>
+      <p id="caseMeta" class="muted">Loading…</p>
+      <div class="grid">
+        <div class="card">
+          <h3>Timeline</h3>
+          <ul id="timeline" class="timeline"></ul>
+        </div>
+        <div class="card">
+          <h3>Photos</h3>
+          <div id="photos" class="photos">No photos</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    // Google Translate dropdown
+    const G_LANG_KEY = 'civicpol_g_lang';
+    const GT_LANGS = { en:'English', hi:'हिन्दी', mr:'मराठी', bn:'বাংলা', ta:'தமிழ்', te:'తెలుగు', gu:'ગુજરાતી', kn:'ಕನ್ನಡ', ml:'മലയാളം', pa:'ਪੰਜਾਬੀ', ur:'اردو', or:'ଓଡ଼ିଆ', as:'অসমীয়া', ne:'नेपाली', sd:'سنڌي' };
+    function fillGoogleLangSelect(){
+      const sel = document.getElementById('gLangSelect'); sel.innerHTML='';
+      Object.entries(GT_LANGS).forEach(([code,name])=>{ const op=document.createElement('option'); op.value=code; op.textContent=name; sel.appendChild(op); });
+      const saved = localStorage.getItem(G_LANG_KEY) || (navigator.language||'en').slice(0,2);
+      sel.value = GT_LANGS[saved] ? saved : 'en';
+      sel.onchange = ()=> { localStorage.setItem(G_LANG_KEY, sel.value); setGoogleLang(sel.value); };
+    }
+    window.googleTranslateElementInit = function(){
+      new google.translate.TranslateElement({
+        pageLanguage: 'en',
+        includedLanguages: Object.keys(GT_LANGS).join(','),
+        autoDisplay: false
+      }, 'google_translate_element');
+      const saved = localStorage.getItem(G_LANG_KEY) || 'en';
+      setTimeout(()=> setGoogleLang(saved), 500);
+    };
+    function setGoogleLang(lang){
+      const sel = document.querySelector('select.goog-te-combo');
+      if (!sel){ setTimeout(()=>setGoogleLang(lang), 200); return; }
+      if (sel.value !== lang){ sel.value = lang; sel.dispatchEvent(new Event('change')); }
+    }
+
+    // Case page logic
+    const q = new URLSearchParams(location.search);
+    const pid = location.pathname.split('/').pop() || q.get('id');
+    function statusClass(s){
+      if (s === 'In Progress') return 'progress';
+      const t = (s||'').toLowerCase();
+      if (t === 'pending') return 'pending';
+      if (t === 'resolved') return 'resolved';
+      return '';
+    }
+
+    async function load() {
+      const res = await fetch('/api/cases/'+pid);
+      if (!res.ok) { document.body.innerHTML='<div class="wrap"><div class="card"><h2>Case not found</h2></div></div>'; return; }
+      const r = await res.json();
+      document.getElementById('caseTitle').textContent = `${r.publicId} — ${r.category}`;
+      const st = document.getElementById('caseStatus');
+      st.textContent = r.status;
+      st.className = 'pill ' + statusClass(r.status);
+
+      const meta = [
+        `Severity: ${r.severity}`,
+        `Dept: ${r.department}`,
+        r.assignedTo ? `Officer: ${r.assignedTo}` : '',
+        r.dueAt ? `Due: ${new Date(r.dueAt).toLocaleString()}` : '',
+        `Reported: ${new Date(r.createdAt).toLocaleString()}`,
+        r.location || ''
+      ].filter(Boolean).join(' • ');
+      document.getElementById('caseMeta').textContent = meta;
+
+      const tl = document.getElementById('timeline'); tl.innerHTML='';
+      (r.timeline||[]).forEach(t=>{
+        const li = document.createElement('li');
+        li.textContent = `${new Date(t.at).toLocaleString()} — ${t.action}${t.note?(' — '+t.note):''}`;
+        tl.appendChild(li);
+      });
+
+      const ph = document.getElementById('photos'); ph.innerHTML='';
+      (r.photos||[]).forEach(p=>{
+        const img = document.createElement('img'); img.src = p; ph.appendChild(img);
+      });
+      if (!r.photos || !r.photos.length) ph.textContent='No photos';
+    }
+
+    (function init(){
+      fillGoogleLangSelect();
+      load();
+    })();
+  </script>
+  <script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+</body>
+</html>

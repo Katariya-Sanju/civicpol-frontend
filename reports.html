@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CivicPol — All Reports</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" type="image/svg+xml" href="cp-logo.svg" />
+</head>
+<body>
+  <div id="toast"></div>
+
+  <div class="app" style="grid-template-columns:1fr">
+    <main class="main">
+      <!-- Topbar -->
+      <header class="topbar reveal" data-animate="fade-up">
+        <div>
+          <h1>All Reports</h1>
+          <p class="muted">Browse and search all reports. Actions appear if you are the owner or an admin.</p>
+        </div>
+        <div class="top-actions" style="gap:12px; align-items:center">
+          <!-- Language (Google Translate) -->
+          <div style="display:flex;align-items:center;gap:6px">
+            <label for="gLangSelect" class="muted" style="font-size:12px">Change Language</label>
+            <select id="gLangSelect" class="input-sm" title="Language"></select>
+          </div>
+          <!-- Hidden container for the Google widget -->
+          <div id="google_translate_element" style="position:absolute; left:-9999px; height:0; width:0; overflow:hidden;"></div>
+
+          <img src="cp-logo-compact.svg" alt="CivicPol" class="hdr-logo" />
+          <a class="btn" href="index.html">← Back to Dashboard</a>
+          <button class="btn" id="adminBtn">Admin Login</button>
+        </div>
+      </header>
+
+      <!-- Filters -->
+      <section class="panel">
+        <div class="filters">
+          <select id="cat">
+            <option value="">All Categories</option>
+            <option>Pothole</option>
+            <option>Waterlogging / Drainage</option>
+            <option>Streetlight not working</option>
+            <option>Garbage dumped</option>
+            <option>Traffic signal not working</option>
+            <option>Encroachment</option>
+          </select>
+          <select id="st">
+            <option value="">All Status</option>
+            <option>Pending</option>
+            <option>In Progress</option>
+            <option>Resolved</option>
+          </select>
+          <input id="q" placeholder="Search description/location…" />
+          <button class="btn light" id="apply">Apply</button>
+          <button class="btn" id="reset">Clear</button>
+        </div>
+      </section>
+
+      <!-- Table -->
+      <section class="panel">
+        <div class="panel-title">Reports</div>
+        <div class="table">
+          <div class="thead">
+            <div>Category</div>
+            <div>Description</div>
+            <div>Severity</div>
+            <div>Actions</div>
+          </div>
+          <div class="tbody" id="body"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Edit modal -->
+  <div class="modal" id="editModal" aria-hidden="true">
+    <div class="modal-backdrop" data-close-edit></div>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3>Edit Report</h3>
+        <button class="icon-btn" data-close-edit>✖</button>
+      </div>
+      <form id="editForm" class="form">
+        <input type="hidden" name="id" />
+        <label>Name</label>
+        <input name="name" />
+        <label>Category</label>
+        <select name="category" required>
+          <option>Pothole</option>
+          <option>Waterlogging / Drainage</option>
+          <option>Streetlight not working</option>
+          <option>Garbage dumped</option>
+          <option>Traffic signal not working</option>
+          <option>Encroachment</option>
+        </select>
+        <label>Severity</label>
+        <select name="severity" required>
+          <option>Normal</option>
+          <option>Minor</option>
+          <option>Urgent</option>
+          <option>Accident-causing</option>
+        </select>
+        <label>Status</label>
+        <select name="status">
+          <option>Pending</option>
+          <option>In Progress</option>
+          <option>Resolved</option>
+        </select>
+        <label>Location</label>
+        <input name="location" />
+        <label>Description</label>
+        <textarea name="description" rows="3"></textarea>
+        <button class="btn gradient" type="submit">Save Changes 💾</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Admin Login Modal -->
+  <div class="modal" id="adminLoginModal" aria-hidden="true">
+    <div class="modal-backdrop" data-close-login></div>
+    <div class="modal-card login-card">
+      <div class="modal-head">
+        <h3>Admin Login</h3>
+        <button class="icon-btn" data-close-login>✖</button>
+      </div>
+      <form id="adminLoginForm" class="form">
+        <label>Admin ID</label>
+        <input class="input-md" name="username" placeholder="Admin ID" />
+        <label>Password</label>
+        <input class="input-md" type="password" name="password" placeholder="Password" />
+        <div class="login-actions">
+          <button type="button" class="btn light" data-close-login>Cancel</button>
+          <button type="submit" class="btn gradient">Login</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    'use strict';
+
+    // Keys
+    const ADMIN_KEY = 'civicpol_admin_token';
+    const OWNER_MAP_KEY = 'civicpol_report_keys';
+    const G_LANG_KEY = 'civicpol_g_lang';
+
+    // Supported Google Translate languages
+    const GT_LANGS = {
+      en:'English', hi:'हिन्दी', mr:'मराठी', bn:'বাংলা', ta:'தமிழ்', te:'తెలుగు',
+      gu:'ગુજરાતી', kn:'ಕನ್ನಡ', ml:'മലയാളം', pa:'ਪੰਜਾਬੀ', ur:'اردو', or:'ଓଡ଼ିଆ',
+      as:'অসমীয়া', ne:'नेपाली', sd:'سنڌي'
+    };
+
+    // Google Translate setup
+    window.googleTranslateElementInit = function(){
+      new google.translate.TranslateElement({
+        pageLanguage: 'en',
+        includedLanguages: Object.keys(GT_LANGS).join(','),
+        autoDisplay: false
+      }, 'google_translate_element');
+
+      const saved = localStorage.getItem(G_LANG_KEY) || 'en';
+      setTimeout(()=> setGoogleLang(saved), 500);
+    };
+
+    function setGoogleLang(lang){
+      const sel = document.querySelector('select.goog-te-combo');
+      if (!sel){ setTimeout(()=>setGoogleLang(lang), 200); return; }
+      if (sel.value !== lang){ sel.value = lang; sel.dispatchEvent(new Event('change')); }
+    }
+
+    function fillGoogleLangSelect(){
+      const sel = document.getElementById('gLangSelect');
+      sel.innerHTML = '';
+      Object.entries(GT_LANGS).forEach(([code,name])=>{
+        const op = document.createElement('option');
+        op.value = code; op.textContent = name;
+        sel.appendChild(op);
+      });
+      const saved = localStorage.getItem(G_LANG_KEY) || (navigator.language||'en').slice(0,2);
+      sel.value = GT_LANGS[saved] ? saved : 'en';
+      sel.onchange = ()=> {
+        const v = sel.value;
+        localStorage.setItem(G_LANG_KEY, v);
+        setGoogleLang(v);
+      };
+    }
+
+    // DOM helpers
+    const $  = (s)=>document.querySelector(s);
+    const $$ = (s)=>document.querySelectorAll(s);
+    const el = (t,c,txt)=>{ const e=document.createElement(t); if(c) e.className=c; if(txt!==undefined) e.textContent=txt; return e; };
+
+    // UI helpers
+    function toast(msg, type='ok'){
+      const t = document.getElementById('toast');
+      const n = el('div','toast '+type,msg);
+      t.appendChild(n);
+      requestAnimationFrame(()=> n.classList.add('show'));
+      setTimeout(()=> { n.classList.remove('show'); setTimeout(()=> n.remove(), 250); }, 2000);
+    }
+
+    function getOwnerMap(){
+      try { return JSON.parse(localStorage.getItem(OWNER_MAP_KEY)||'{}'); }
+      catch { return {}; }
+    }
+    function isOwner(id){ const m = getOwnerMap(); return !!m[id]; }
+
+    async function verifyAdmin(){
+      const t=localStorage.getItem(ADMIN_KEY);
+      if(!t) return false;
+      try { const r=await fetch('/api/auth/verify',{ headers:{ Authorization:'Bearer '+t } }); return r.ok; }
+      catch { return false; }
+    }
+    async function authFetch(url,opts={}) {
+      const t=localStorage.getItem(ADMIN_KEY);
+      const h=Object.assign({},opts.headers||{}, t?{ Authorization:'Bearer '+t }:{}); 
+      return fetch(url,Object.assign({},opts,{headers:h}));
+    }
+    function ownerFetch(id,url,opts={}) {
+      const m=getOwnerMap(); const key=m[id];
+      const h=Object.assign({},opts.headers||{}, key?{ 'X-Report-Key':key }:{});
+      return fetch(url,Object.assign({},opts,{headers:h}));
+    }
+
+    // Modals
+    function showLogin(show){
+      const m=document.getElementById('adminLoginModal');
+      if (show){ m.classList.add('show'); document.body.classList.add('modal-open'); }
+      else { m.classList.remove('show'); document.body.classList.remove('modal-open'); }
+    }
+    function showEdit(show){
+      const m=document.getElementById('editModal');
+      if (show){ m.classList.add('show'); document.body.classList.add('modal-open'); }
+      else { m.classList.remove('show'); document.body.classList.remove('modal-open'); }
+    }
+    document.querySelectorAll('[data-close-login]').forEach(b=> b.addEventListener('click', ()=>showLogin(false)));
+    document.querySelectorAll('[data-close-edit]').forEach(b=> b.addEventListener('click', ()=>showEdit(false)));
+
+    // Admin Btn
+    async function updateAdminBtn(){
+      const ok = await verifyAdmin();
+      document.getElementById('adminBtn').textContent = ok ? 'Logout Admin' : 'Admin Login';
+    }
+    document.getElementById('adminBtn').addEventListener('click', async ()=>{
+      if (await verifyAdmin()){
+        await authFetch('/api/auth/logout',{ method:'POST' });
+        localStorage.removeItem(ADMIN_KEY);
+        toast('Logged out','ok');
+        await updateAdminBtn();
+        load();
+      } else {
+        showLogin(true);
+      }
+    });
+
+    // Admin Login
+    document.getElementById('adminLoginForm').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const payload = Object.fromEntries(fd.entries());
+      const res = await fetch('/api/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (!res.ok || !data.success){ toast('Invalid credentials','err'); return; }
+      localStorage.setItem(ADMIN_KEY, data.token);
+      toast('Admin mode enabled 🔒','ok');
+      showLogin(false);
+      await updateAdminBtn();
+      load();
+    });
+
+    // Data
+    let all = [];
+    async function fetchList(){
+      const p = new URLSearchParams();
+      const cat=document.getElementById('cat').value;
+      const st=document.getElementById('st').value;
+      const q=document.getElementById('q').value.trim();
+      if (cat) p.set('category', cat);
+      if (st)  p.set('status', st);
+      if (q)   p.set('q', q);
+      p.set('limit','500');
+      const res = await fetch('/api/reports?'+p.toString());
+      return res.json();
+    }
+
+    function render(){
+      const body = document.getElementById('body');
+      body.innerHTML='';
+      const adminMode = (localStorage.getItem(ADMIN_KEY) != null);
+
+      all.forEach(r=>{
+        const row = el('div','row');
+
+        const c1 = el('div','cell'); c1.textContent = r.category;
+        const c2 = el('div','cell'); c2.textContent = r.description || '-';
+        const c3 = el('div','cell'); c3.textContent = r.severity;
+
+        const c4 = el('div','cell cell-actions');
+        const owner = isOwner(r.id);
+
+        if (adminMode || owner){
+          const up = el('button','btn xs','Upload Photo');
+          up.onclick = ()=>{
+            const input = document.createElement('input');
+            input.type='file'; input.accept='image/*';
+            input.onchange = async ()=>{
+              const fd = new FormData();
+              const file = input.files && input.files[0];
+              if (!file) return;
+              fd.append('photo', file);
+              const req = adminMode
+                ? authFetch('/api/reports/'+r.id+'/photos',{ method:'POST', body: fd })
+                : ownerFetch(r.id, '/api/reports/'+r.id+'/photos',{ method:'POST', body: fd });
+              const res = await req;
+              if (res.ok){ toast('Photo uploaded'); load(); } else toast('Upload failed','err');
+            };
+            input.click();
+          };
+
+          const ed = el('button','btn xs warn','Edit');
+          ed.onclick = ()=>{
+            const f = document.getElementById('editForm');
+            f.id.value = r.id;
+            f.name.value = r.name || '';
+            f.category.value = r.category;
+            f.severity.value = r.severity;
+            f.status.value = r.status;
+            f.location.value = r.location || '';
+            f.description.value = r.description || '';
+            showEdit(true);
+
+            f.onsubmit = async (ev)=>{
+              ev.preventDefault();
+              const payload = {
+                name: f.name.value,
+                category: f.category.value,
+                severity: f.severity.value,
+                status: f.status.value, // server ignores owner
+                location: f.location.value,
+                description: f.description.value
+              };
+              const req = adminMode
+                ? authFetch('/api/reports/'+r.id,{ method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+                : ownerFetch(r.id, '/api/reports/'+r.id,{ method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+              const res = await req;
+              if (res.ok){ toast('Saved'); showEdit(false); load(); } else toast('Save failed','err');
+            };
+          };
+
+          const del = el('button','btn xs danger','Delete');
+          del.onclick = async ()=>{
+            if (!confirm('Delete this report?')) return;
+            const req = adminMode
+              ? authFetch('/api/reports/'+r.id,{ method:'DELETE' })
+              : ownerFetch(r.id, '/api/reports/'+r.id,{ method:'DELETE' });
+            const res = await req;
+            if (res.ok){ toast('Deleted'); load(); } else toast('Delete failed','err');
+          };
+
+          c4.append(up, ed, del);
+        } else {
+          c4.textContent = '—';
+        }
+
+        row.append(c1,c2,c3,c4);
+        body.appendChild(row);
+      });
+    }
+
+    async function load(){
+      all = await fetchList();
+      render();
+    }
+
+    // Filters
+    document.getElementById('apply').addEventListener('click', ()=>{ load(); });
+    document.getElementById('reset').addEventListener('click', ()=>{
+      document.getElementById('cat').value='';
+      document.getElementById('st').value='';
+      document.getElementById('q').value='';
+      load();
+    });
+
+    (async function init(){
+      fillGoogleLangSelect();
+      await updateAdminBtn();
+      await load();
+      setInterval(load, 30000);
+    })();
+  </script>
+
+  <!-- Google Translate script -->
+  <script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+</body>
+</html>

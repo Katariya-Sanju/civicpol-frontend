@@ -1,0 +1,11 @@
+{
+  "name": "CivicPol",
+  "short_name": "CivicPol",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "theme_color": "#2563EB",
+  "background_color": "#E6F9FF",
+  "icons": [
+    { "src": "cp-logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
