@@ -210,7 +210,7 @@
     async function verifyAdmin(){
       const t=localStorage.getItem(ADMIN_KEY);
       if(!t) return false;
-      try { const r=await fetch('/api/auth/verify',{ headers:{ Authorization:'Bearer '+t } }); return r.ok; }
+      try { const r=await fetch('https://civicpol-backend.onrender.com/api/auth/verify', { headers: {...} }); return r.ok; }
       catch { return false; }
     }
     async function authFetch(url,opts={}) {
@@ -245,7 +245,7 @@
     }
     document.getElementById('adminBtn').addEventListener('click', async ()=>{
       if (await verifyAdmin()){
-        await authFetch('/api/auth/logout',{ method:'POST' });
+        await authfetch('https://civicpol-backend.onrender.com/api/auth/logout', { method: 'POST' });
         localStorage.removeItem(ADMIN_KEY);
         toast('Logged out','ok');
         await updateAdminBtn();
@@ -260,7 +260,7 @@
       e.preventDefault();
       const fd = new FormData(e.target);
       const payload = Object.fromEntries(fd.entries());
-      const res = await fetch('/api/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      const res = await fetch('https://civicpol-backend.onrender.com/api/auth/login', { method: 'POST', headers: {...} });
       const data = await res.json();
       if (!res.ok || !data.success){ toast('Invalid credentials','err'); return; }
       localStorage.setItem(ADMIN_KEY, data.token);
@@ -281,7 +281,7 @@
       if (st)  p.set('status', st);
       if (q)   p.set('q', q);
       p.set('limit','500');
-      const res = await fetch('/api/reports?'+p.toString());
+      const res = await fetch('https://civicpol-backend.onrender.com/api/reports?' + p.toString());
       return res.json();
     }
 
@@ -311,7 +311,7 @@
               if (!file) return;
               fd.append('photo', file);
               const req = adminMode
-                ? authFetch('/api/reports/'+r.id+'/photos',{ method:'POST', body: fd })
+                ? authfetch('https://civicpol-backend.onrender.com/api/reports/' + r.id + '/photos', { method: 'POST', body: fd })
                 : ownerFetch(r.id, '/api/reports/'+r.id+'/photos',{ method:'POST', body: fd });
               const res = await req;
               if (res.ok){ toast('Photo uploaded'); load(); } else toast('Upload failed','err');
@@ -342,7 +342,11 @@
                 description: f.description.value
               };
               const req = adminMode
-                ? authFetch('/api/reports/'+r.id,{ method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+                ? authFetch('https://civicpol-backend.onrender.com/api/reports/' + r.id, {
+  method: 'PATCH',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(payload)
+})
                 : ownerFetch(r.id, '/api/reports/'+r.id,{ method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
               const res = await req;
               if (res.ok){ toast('Saved'); showEdit(false); load(); } else toast('Save failed','err');
@@ -353,7 +357,9 @@
           del.onclick = async ()=>{
             if (!confirm('Delete this report?')) return;
             const req = adminMode
-              ? authFetch('/api/reports/'+r.id,{ method:'DELETE' })
+              ? authFetch('https://civicpol-backend.onrender.com/api/reports/' + r.id, {
+  method: 'DELETE'
+})
               : ownerFetch(r.id, '/api/reports/'+r.id,{ method:'DELETE' });
             const res = await req;
             if (res.ok){ toast('Deleted'); load(); } else toast('Delete failed','err');
@@ -394,4 +400,5 @@
   <!-- Google Translate script -->
   <script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 </body>
+
 </html>
